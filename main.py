@@ -5,6 +5,23 @@ import threading
 from tkinter import filedialog  # For file selection
 
 
+COLOUR_MAP = [
+    [(0, 0, 0),       (179, 255, 93),   "BLACK",  0, (0, 0, 0)],    
+    [(0, 90, 10),     (15, 250, 100),   "BROWN",  1, (0, 51, 102)],    
+    [(0, 30, 80),     (10, 255, 200),   "RED",    2, (0, 0, 255)],
+    [(10, 70, 70),    (25, 255, 200),   "ORANGE", 3, (0, 128, 255)], 
+    [(30, 170, 100),  (40, 250, 255),   "YELLOW", 4, (0, 255, 255)],
+    [(35, 20, 110),   (60, 45, 120),    "GREEN",  5, (0, 255, 0)],  
+    [(65, 0, 85),     (115, 30, 147),   "BLUE",   6, (255, 0, 0)],  
+    [(120, 40, 100),  (140, 250, 220),  "PURPLE", 7, (255, 0, 127)], 
+    [(0, 0, 50),      (179, 50, 80),    "GRAY",   8, (128, 128, 128)],      
+    [(0, 0, 90),      (179, 15, 250),   "WHITE",  9, (255, 255, 255)]
+]
+RED_TOP_LOWER = (160, 30, 80)
+RED_TOP_UPPER = (179, 255, 200)
+MIN_AREA = 700
+FONT = cv2.FONT_HERSHEY_SIMPLEX
+
 class OhmegaResistorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -13,88 +30,88 @@ class OhmegaResistorApp(ctk.CTk):
         self.iconbitmap("Tools/OhmegaVision.ico")  # Set your icon path here
 
         # Bottom fram for author and version
-        bottom_frame = ctk.CTkFrame(self)
-        bottom_frame.pack(side="bottom", fill="x", pady=5, padx=5)
-        author_label = ctk.CTkLabel(bottom_frame, text="Developed by nemelion13 - All rights reserved © 2026")
-        author_label.pack(side="left", padx=10)
-        version_label = ctk.CTkLabel(bottom_frame, text="Version 1.0")
-        version_label.pack(side="right", padx=10)
-        contact_label = ctk.CTkLabel(bottom_frame, text="Contact: nemelion13@gmail.com")
-        contact_label.pack(side="right", padx=10)
+        self.bottom_frame = ctk.CTkFrame(self)
+        self.bottom_frame.pack(side="bottom", fill="x", pady=5, padx=5)
+        self.author_label = ctk.CTkLabel(self.bottom_frame, text="Developed by nemelion13 - All rights reserved © 2026")
+        self.author_label.pack(side="left", padx=10)
+        self.version_label = ctk.CTkLabel(self.bottom_frame, text="Version 1.0")
+        self.version_label.pack(side="right", padx=10)
+        self.contact_label = ctk.CTkLabel(self.bottom_frame, text="Contact: nemelion13@gmail.com")
+        self.contact_label.pack(side="right", padx=10)
 
         #Frame for video and zoom button
-        video_frame = ctk.CTkFrame(self)
-        video_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        self.video_frame = ctk.CTkFrame(self)
+        self.video_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
         # Label to display the image or video stream
-        self.video_label = ctk.CTkLabel(video_frame, text="")
+        self.video_label = ctk.CTkLabel(self.video_frame, text="")
         self.video_label.pack(padx=10, pady=10)
 
         #zoom button
-        zoom_frame = ctk.CTkFrame(video_frame)
-        zoom_frame.pack(side="top", fill="x", padx=10, pady=10)
-        zoom_label = ctk.CTkLabel(zoom_frame, text="Zoom Camera:")
-        zoom_label.pack(side="left", padx=10)
-        self.zoom_btn = ctk.CTkSlider(zoom_frame, from_=0, to=100, number_of_steps=10, command=self.zoom_image)
+        self.zoom_frame = ctk.CTkFrame(self.video_frame)
+        self.zoom_frame.pack(side="top", fill="x", padx=10, pady=10)
+        self.zoom_label = ctk.CTkLabel(self.zoom_frame, text="Zoom Camera:")
+        self.zoom_label.pack(side="left", padx=10)
+        self.zoom_btn = ctk.CTkSlider(self.zoom_frame, from_=0, to=100, number_of_steps=10, command=self.zoom_image)
         self.zoom_btn.pack(side="left",padx=10)
 
         # Label to display the result
-        result_frame = ctk.CTkFrame(video_frame)
-        result_frame.pack(side="bottom", fill="x", padx=10, pady=10)
-        self.result_label = ctk.CTkLabel(result_frame, text="Value: ", font=("Arial", 20))
+        self.result_frame = ctk.CTkFrame(self.video_frame)
+        self.result_frame.pack(side="bottom", fill="x", padx=10, pady=10)
+        self.result_label = ctk.CTkLabel(self.result_frame, text="Value: ", font=("Arial", 20))
         self.result_label.pack(pady=10)
 
 
 
 
         # Frame for the buttons
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(side="left",fill= "y",padx=10, pady=10)
+        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame.pack(side="left",fill= "y",padx=10, pady=10)
 
         # Frame for the camera and capture buttons
-        camera_frame = ctk.CTkFrame(button_frame)
-        camera_frame.pack(side="top", fill="x", padx=10, pady=10)
-        camera_label_frame = ctk.CTkFrame(camera_frame)
-        camera_label_frame.pack(side="top", fill="x", padx=10,pady=10)
+        self.camera_frame = ctk.CTkFrame(self.button_frame)
+        self.camera_frame.pack(side="top", fill="x", padx=10, pady=10)
+        self.camera_label_frame = ctk.CTkFrame(self.camera_frame)
+        self.camera_label_frame.pack(side="top", fill="x", padx=10,pady=10)
         camera_img = ctk.CTkImage(light_image=Image.open("Tools/Camera_image.png"), size=(20, 20))
-        camera_icon = ctk.CTkLabel(camera_label_frame, image=camera_img, text="")
+        camera_icon = ctk.CTkLabel(self.camera_label_frame, image=camera_img, text="")
         camera_icon.pack(side="left", padx=5)
-        camera_label = ctk.CTkLabel(camera_label_frame, text="Camera Control", font=("Arial", 16))
-        camera_label.pack(side="left", padx=5)
+        self.camera_label = ctk.CTkLabel(self.camera_label_frame, text="Camera Control", font=("Arial", 16))
+        self.camera_label.pack(side="left", padx=5)
 
 
         # Button to start the camera
-        self.camera_btn = ctk.CTkButton(camera_frame, text="Start Camera", command=self.start_camera)
+        self.camera_btn = ctk.CTkButton(self.camera_frame, text="Start Camera", command=self.start_camera)
         self.camera_btn.pack(side="top", padx=10, pady=10)
 
         # Button to capture an image from the camera
-        self.capture_btn = ctk.CTkButton( camera_frame, text="Capture", command=self.capture_image, state="disabled")
+        self.capture_btn = ctk.CTkButton( self.camera_frame, text="Capture", command=self.capture_image, state="disabled")
         self.capture_btn.pack(side="top", padx=10, pady=10)
 
         # Button to open a file
-        self.file_btn = ctk.CTkButton(camera_frame, text="Open Image", command=self.open_file)
+        self.file_btn = ctk.CTkButton(self.camera_frame, text="Open Image", command=self.open_file)
         self.file_btn.pack(side="top", padx=10, pady=10)
 
         
 
         #Frame for settings and help
-        settings_frame = ctk.CTkFrame(button_frame)
+        settings_frame = ctk.CTkFrame(self.button_frame)
         settings_frame.pack(side="top", fill="x", padx=10, pady=10)
-        settings_label_frame = ctk.CTkFrame(settings_frame)
-        settings_label_frame.pack(side="top", fill="x", padx=10, pady=10)
+        self.settings_frame_label = ctk.CTkFrame(settings_frame)
+        self.settings_frame_label.pack(side="top", fill="x", padx=10, pady=10)
 
         settings_img = ctk.CTkImage(light_image=Image.open("Tools/Settings_image.png"), size=(20, 20))
-        settings_icon = ctk.CTkLabel(settings_label_frame, image=settings_img, text="")
+        settings_icon = ctk.CTkLabel(self.settings_frame_label, image=settings_img, text="")
         settings_icon.pack(side="left", padx=5)
-        settings_label = ctk.CTkLabel(settings_label_frame,text="Settings", font=("Arial", 16))
-        settings_label.pack(side="left", padx=5)
+        self.settings_label = ctk.CTkLabel(self.settings_frame_label,text="Settings", font=("Arial", 16))
+        self.settings_label.pack(side="left", padx=5)
 
 
         # Combo box for appearance mode selection
         appearance_frame = ctk.CTkFrame(settings_frame)
         appearance_frame.pack(side="top", fill="x", pady=10, padx=10)
-        appearance_frame_label = ctk.CTkLabel(appearance_frame, text="Appearance Mode:")
-        appearance_frame_label.pack(side="left", padx=10)
+        self.appearance_frame_label = ctk.CTkLabel(appearance_frame, text="Appearance Mode:")
+        self.appearance_frame_label.pack(side="left", padx=10)
         self.appearance_mode = ctk.CTkComboBox(appearance_frame, values=["Light", "Dark"], command=self.change_appearance_mode)
         self.appearance_mode.set("Light")
         self.appearance_mode.pack(pady=10)
@@ -102,50 +119,37 @@ class OhmegaResistorApp(ctk.CTk):
         # combo box for language
         language_frame = ctk.CTkFrame(settings_frame)
         language_frame.pack(side="top", fill="x", pady=10, padx=10)
-        language_frame_label = ctk.CTkLabel(language_frame, text="Language Mode:")
-        language_frame_label.pack(side="left", padx=10)
+        self.language_frame_label = ctk.CTkLabel(language_frame, text="Language Mode:")
+        self.language_frame_label.pack(side="left", padx=10)
         self.language_box = ctk.CTkComboBox(language_frame, values=["English", "Français"], command=self.change_language)
         self.language_box.set("English")
-        language_frame_label.pack(side="left", padx=10)
         self.language_box.pack(pady=10)
 
         # Frame for help and about
-        help_frame = ctk.CTkFrame(button_frame)
+        help_frame = ctk.CTkFrame(self.button_frame)
         help_frame.pack(side="top", fill="x", padx=10, pady=10)
         help_label_frame = ctk.CTkFrame(help_frame)
         help_label_frame.pack(side="top", fill="x", padx=10, pady=10)
         help_img = ctk.CTkImage(light_image=Image.open("Tools/Help_Support_image.png"), size=(20, 20))
         help_icon = ctk.CTkLabel(help_label_frame, image=help_img, text="")
         help_icon.pack(side="left", padx=5)
-        help_label = ctk.CTkLabel(help_label_frame, text="Help & Support", font=("Arial", 16))
-        help_label.pack(side="left", padx=5)
+        self.help_label = ctk.CTkLabel(help_label_frame, text="Help & Support", font=("Arial", 16))
+        self.help_label.pack(side="left", padx=5)
 
         # Frame for help and about buttons
         help_buttons_frame = ctk.CTkFrame(help_frame)
         help_buttons_frame.pack(side="top", fill="x", padx=10, pady=10)
-        help_btn = ctk.CTkButton(help_buttons_frame, text="Help", command=self.show_help)
-        help_btn.pack(side="left", padx=10, pady=10)
-        guide_btn = ctk.CTkButton(help_buttons_frame, text="Guide", command=self.show_guide)
-        guide_btn.pack(side="left", padx=10, pady=10)
+        self.help_btn = ctk.CTkButton(help_buttons_frame, text="Help", command=lambda: self.open_top_window("Help", self.language_box.get()), fg_color="red")
+        self.help_btn.pack(side="left", padx=10, pady=10)
+        self.guide_btn = ctk.CTkButton(help_buttons_frame, text="Guide", command=lambda: self.open_top_window("Guide", self.language_box.get()), fg_color="red")
+        self.guide_btn.pack(side="left", padx=10, pady=10)
         #about_btn = ctk.CTkButton(help_buttons_frame, text="About", command=self.show_about)
         #about_btn.pack(side="top", padx=10, pady=10)
 
-        # window for displaying guide for resistor calculation
-        self.guide_window = ctk.CTkToplevel(self)
-        self.guide_window.title("Resistor Calculation Guide")
-        self.guide_window.geometry("600x400")
-        #self.guide_window.withdraw()  # Hide the window initially
-
-        # Main frame displaying content
-        guide_frame = ctk.CTkFrame(self.guide_window)
-        guide_frame.pack(side="top", padx=10, pady=10)
         
 
 
-        # image to display in the guide window
-        guide_img = ctk.CTkImage(light_image=Image.open("Tools/English_guide_image.png"),size=(500, 320))
-        guide_label = ctk.CTkLabel(guide_frame, image =guide_img, text=" ")
-        guide_label.pack()
+        
         
 
 
@@ -155,25 +159,102 @@ class OhmegaResistorApp(ctk.CTk):
         self.thread = None
         self.current_frame = None  # To store the current frame
 
+    def open_top_window(self, title,language):
+        """Open a new top-level window with the given title and content."""
+        top_window = ctk.CTkToplevel(self)
+        top_window.title(title)
+        top_window.geometry("600x400")
+        if language == "Français":
+            if title == "Help":
+                content = "Aide: \n\n1. Démarrez la caméra ou ouvrez une image.\n2. Capturez l'image du composant.\n3. L'application analysera l'image et affichera la valeur de la résistance."
+                help_label = ctk.CTkLabel(top_window, text=content, font=("Arial", 14))
+                help_label.pack(pady=20, padx=20)
+            elif title == "Guide":
+                # image to display in the guide window
+                guide_img = ctk.CTkImage(light_image=Image.open("Tools/French_guide_image.png"),size=(500, 320))
+                guide_label = ctk.CTkLabel(top_window, image =guide_img, text=" ")
+                guide_label.pack()
+                content = "Guide: \n\n1. Ouvrez l'application.\n2. Démarrez la caméra ou ouvrez une image.\n3. Capturez l'image du composant.\n4. L'application analysera l'image et affichera la valeur de la résistance."
+        else:
+            if title == "Help":
+                content = "Help: \n\n1. Start the camera or open an image.\n2. Capture the component's image.\n3. The application will analyze the image and display the resistor value."
+                help_label = ctk.CTkLabel(top_window, text=content, font=("Arial", 14))
+                help_label.pack(pady=20, padx=20)
+            elif title == "Guide":
+                # image to display in the guide window
+                guide_img = ctk.CTkImage(light_image=Image.open("Tools/English_guide_image.png"),size=(500, 320))
+                guide_label = ctk.CTkLabel(top_window, image =guide_img, text=" ")
+                guide_label.pack()
+                content = "Guide: \n\n1. Open the application.\n2. Start the camera or open an image.\n3. Capture the component's image.\n4. The application will analyze the image and display the resistor value."
+    # Language change function
+    translations = {
+        "English": {
+            "Value": "Value: ",
+            "Start Camera": "Start Camera",
+            "Capture": "Capture",
+            "Open Image": "Open Image",
+            "Appearance Mode": "Appearance Mode:",
+            "Language Mode": "Language Mode:",
+            "Settings": "Settings",
+            "Help & Support": "Help & Support",
+            "Camera Control" : "Camera Control",
+            "Help": "Help", 
+            # colors
+            "black": "Black",
+            "brown": "Brown",
+            "red": "Red",
+            "orange": "Orange",
+            "yellow": "Yellow",
+            "green": "Green",
+            "blue": "Blue",
+            "violet": "Violet",
+            "gray": "Gray",
+            "white": "White",
+            "gold": "Gold",
+            "silver": "Silver"
+        },
+        "Français": {
+            "Value": "Valeur: ",
+            "Start Camera": "Démarrer la caméra",
+            "Capture": "Capturer",
+            "Open Image": "Ouvrir l'image",
+            "Appearance Mode": "Mode d'apparence:",
+            "Language Mode": "Mode de langue:",
+            "Settings": "Paramètres",
+            "Help & Support": "Aide et Assistance",
+            "Camera Control" : "Contrôle de la caméra",
+            "Help": "Aide",
+            # colors in French
+            "black": "Noir",
+            "brown": "Marron",
+            "red": "Rouge",
+            "orange": "Orange",
+            "yellow": "Jaune",
+            "green": "Vert",
+            "blue": "Bleu",
+            "violet": "Violet",
+            "gray": "Gris",
+            "white": "Blanc",
+            "gold": "Or",
+            "silver": "Argent"
+        }
+    }
+
     def change_language(self, language):
         """Change the language of the application."""
-        # This is a placeholder for actual language change logic.
-        # You would typically load different text resources based on the selected language.
-        if language == "Français":
-            self.result_label.configure(text="Valeur: ")
-            self.camera_btn.configure(text="Démarrer la caméra")
-            self.capture_btn.configure(text="Capturer")
-            self.file_btn.configure(text="Ouvrir l'image")
-            self.appearance_mode.set("Mode d'apparence")
-            self.language_frame_label.configure(text="Mode de langue:")
-            self.appearance_frame_label.configure(text="Mode d'apparence:")
-            self.settings_label = ctk.CTkLabel(self.settings_label_frame,text="Paramètres", font=("Arial", 16))
-
-        else:
-            self.result_label.configure(text="Value: ")
-            self.camera_btn.configure(text="Start Camera")
-            self.capture_btn.configure(text="Capture")
-            self.file_btn.configure(text="Open Image")
+        if language in self.translations:
+            self.result_label.configure(text=self.translations[language]["Value"])
+            self.camera_btn.configure(text=self.translations[language]["Start Camera"])
+            self.capture_btn.configure(text=self.translations[language]["Capture"])
+            self.file_btn.configure(text=self.translations[language]["Open Image"])
+            self.appearance_frame_label.configure(text=self.translations[language]["Appearance Mode"])
+            self.language_frame_label.configure(text=self.translations[language]["Language Mode"])
+            self.settings_label.configure(text=self.translations[language]["Settings"])
+            self.help_label.configure(text=self.translations[language]["Help & Support"])
+            self.camera_label.configure(text=self.translations[language]["Camera Control"])
+            self.help_btn.configure(text=self.translations[language]["Help"])
+            # Update other labels and buttons as needed
+            
 
     def change_appearance_mode(self, mode):
         """Change the appearance mode of the application."""
