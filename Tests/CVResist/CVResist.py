@@ -84,7 +84,8 @@ def displayResults(sortedbands):
 
 # main method, here we accept the image.
 if __name__ == '__main__':
-    image_path = 'Resistor220OHMS.jpg'
+    image_path = "Resistor220OHMS.png"
+    
     image = cv.imread(image_path)
 
     if image is None:
