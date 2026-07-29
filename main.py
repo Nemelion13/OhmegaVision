@@ -3,6 +3,7 @@ from PIL import Image
 import cv2
 import threading
 from tkinter import filedialog  # For file selection
+from ultralytics import YOLO
 
 
 COLOUR_MAP = [
@@ -22,11 +23,16 @@ RED_TOP_UPPER = (179, 255, 200)
 MIN_AREA = 700
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
+class ResistorColoredBandsModel():
+    def __init__(self):
+
+        self.model = YOLO("yolo26n.pt")
+RCBM = ResistorColoredBandsModel()
 class OhmegaResistorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Ohmega Vision Resistor Reader")
-        self.geometry("800x600")
+        self.geometry("850x700")
         self.iconbitmap("Tools/OhmegaVision.ico")  # Set your icon path here
 
         # Bottom fram for author and version
@@ -52,8 +58,11 @@ class OhmegaResistorApp(ctk.CTk):
         self.zoom_frame.pack(side="top", fill="x", padx=10, pady=10)
         self.zoom_label = ctk.CTkLabel(self.zoom_frame, text="Zoom Camera:")
         self.zoom_label.pack(side="left", padx=10)
-        self.zoom_btn = ctk.CTkSlider(self.zoom_frame, from_=0, to=100, number_of_steps=10, command=self.zoom_image)
-        self.zoom_btn.pack(side="left",padx=10)
+        self.zoom_btn = ctk.CTkSlider(self.zoom_frame, from_=1.0, to=8.0, number_of_steps=70, command=self.zoom_video)
+        self.zoom_btn.set(1.0)
+        self.zoom_btn.pack(side="left", padx=10)
+        self.zoom_value_label = ctk.CTkLabel(self.zoom_frame, text="1.0x")
+        self.zoom_value_label.pack(side="left", padx=10)
 
         # Label to display the result
         self.result_frame = ctk.CTkFrame(self.video_frame)
@@ -80,17 +89,26 @@ class OhmegaResistorApp(ctk.CTk):
         self.camera_label.pack(side="left", padx=5)
 
 
-        # Button to start the camera
-        self.camera_btn = ctk.CTkButton(self.camera_frame, text="Start Camera", command=self.start_camera)
-        self.camera_btn.pack(side="top", padx=10, pady=10)
+        # Button container for camera controls
+        self.camera_button_frame = ctk.CTkFrame(self.camera_frame)
+        self.camera_button_frame.pack(side="top", fill="x", padx=10, pady=10)
+        self.camera_btn = ctk.CTkButton(self.camera_button_frame, text="Start Camera", command=self.start_camera)
+        self.camera_btn.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
         # Button to capture an image from the camera
-        self.capture_btn = ctk.CTkButton( self.camera_frame, text="Capture", command=self.capture_image, state="disabled")
-        self.capture_btn.pack(side="top", padx=10, pady=10)
+        self.capture_btn = ctk.CTkButton(self.camera_button_frame, text="Capture", command=self.capture_image, state="disabled")
+        self.capture_btn.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         # Button to open a file
-        self.file_btn = ctk.CTkButton(self.camera_frame, text="Open Image", command=self.open_file)
-        self.file_btn.pack(side="top", padx=10, pady=10)
+        self.file_btn = ctk.CTkButton(self.camera_button_frame, text="Open Image", command=self.open_file)
+        self.file_btn.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        # Button to clean the video/image display
+        self.clean_btn = ctk.CTkButton(self.camera_button_frame, text="Clean", command=self.clean_display)
+        self.clean_btn.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+
+        self.camera_button_frame.grid_columnconfigure(0, weight=1)
+        self.camera_button_frame.grid_columnconfigure(1, weight=1)
 
         
 
@@ -125,6 +143,16 @@ class OhmegaResistorApp(ctk.CTk):
         self.language_box.set("English")
         self.language_box.pack(pady=10)
 
+        # combo box for camera index
+        camera_index_frame = ctk.CTkFrame(settings_frame)
+        camera_index_frame.pack(side="top",fill="x",pady=10,padx=10)
+        self.camera_index_frame_label = ctk.CTkLabel(camera_index_frame,text="Camera Index:")
+        self.camera_index_frame_label.pack(side="left",padx=10)
+        self.camera_index_box = ctk.CTkComboBox(camera_index_frame,values=[f"{i}" for i in range(11)]) 
+        self.camera_index_box.set("0")
+        self.camera_index_box.pack(pady=10)  
+        
+
         # Frame for help and about
         help_frame = ctk.CTkFrame(self.button_frame)
         help_frame.pack(side="top", fill="x", padx=10, pady=10)
@@ -158,6 +186,7 @@ class OhmegaResistorApp(ctk.CTk):
         self.running = False
         self.thread = None
         self.current_frame = None  # To store the current frame
+        self.zoom_factor = 1.0
 
     def open_top_window(self, title,language):
         """Open a new top-level window with the given title and content."""
@@ -199,6 +228,7 @@ class OhmegaResistorApp(ctk.CTk):
             "Help & Support": "Help & Support",
             "Camera Control" : "Camera Control",
             "Help": "Help", 
+            "Clean" :"Clean",
             # colors
             "black": "Black",
             "brown": "Brown",
@@ -224,6 +254,7 @@ class OhmegaResistorApp(ctk.CTk):
             "Help & Support": "Aide et Assistance",
             "Camera Control" : "Contrôle de la caméra",
             "Help": "Aide",
+            "Clean" : "Nettoyer",
             # colors in French
             "black": "Noir",
             "brown": "Marron",
@@ -253,12 +284,17 @@ class OhmegaResistorApp(ctk.CTk):
             self.help_label.configure(text=self.translations[language]["Help & Support"])
             self.camera_label.configure(text=self.translations[language]["Camera Control"])
             self.help_btn.configure(text=self.translations[language]["Help"])
+            self.clean_btn.configure(text=self.translations[language]["Clean"])
             # Update other labels and buttons as needed
             
 
     def change_appearance_mode(self, mode):
         """Change the appearance mode of the application."""
         ctk.set_appearance_mode(mode)
+    
+    #def change_camera_index(self,index):
+        #"""Change the index of the camera for cv2.VideoCapture(index)"""
+        
 
 
     def open_file(self):
@@ -271,25 +307,45 @@ class OhmegaResistorApp(ctk.CTk):
         if file_path:
             # Read the image with OpenCV
             img = cv2.imread(file_path)
+           
             if img is not None:
                 # Display the image in the interface
                 self.display_image(img)
                 # Start processing
                 self.process_image(img)
+                result = RCBM.model(img)
+                cv2.imshow("test window", result[0].plot())
     def show_guide(self,img):
         pass
 
     def show_help(self):
         pass
 
-    def zoom_image(self):
-        """Zoom in on the current image."""
-        if self.current_frame is not None:
-            # Resize the image to double its size
-            zoomed_img = cv2.resize(self.current_frame, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
-            self.display_image(zoomed_img)
+    def zoom_video(self, value):
+        """Update the current zoom factor from the slider."""
+        self.zoom_factor = max(1.0, float(value))
+        if hasattr(self, 'zoom_value_label'):
+            self.zoom_value_label.configure(text=f"{self.zoom_factor:.1f}x")
 
     def display_image(self, img):
+        """Display an image in the video label."""
+        if self.zoom_factor != 1.0:
+            h, w = img.shape[:2]
+            new_h = int(h / self.zoom_factor)
+            new_w = int(w / self.zoom_factor)
+            start_y = max(0, (h - new_h) // 2)
+            start_x = max(0, (w - new_w) // 2)
+            cropped = img[start_y:start_y + new_h, start_x:start_x + new_w]
+            img = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+        # Convert BGR (OpenCV) to RGB (PIL)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # Convert to PIL Image
+        pil_img = Image.fromarray(img_rgb)
+        # Create a CustomTkinter image
+        ctk_image = ctk.CTkImage(light_image=pil_img, size=(440, 280))
+        # Update the label with the new image
+        self.video_label.configure(image=ctk_image)
+        self.video_label.image = ctk_image  # Keep a reference
         """Display an image in the video label."""
         # Convert BGR (OpenCV) to RGB (PIL)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -305,7 +361,8 @@ class OhmegaResistorApp(ctk.CTk):
         """Start the camera stream in a separate thread."""
         if self.running:
             return
-        self.cap = cv2.VideoCapture(0)
+        camera_index = int(self.camera_index_box.get())
+        self.cap = cv2.VideoCapture(camera_index,cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             print("Error: Unable to open the camera.")
             return
@@ -321,8 +378,20 @@ class OhmegaResistorApp(ctk.CTk):
         self.running = False
         if self.cap:
             self.cap.release()
+            self.cap = None
         self.camera_btn.configure(text="Start Camera", command=self.start_camera)
         self.capture_btn.configure(state="disabled")
+
+    def clean_display(self):
+        """Stop camera and clear the video/image display."""
+        if self.running:
+            self.stop_camera()
+        self.current_frame = None
+        self.video_label.configure(image="", text="")
+        self.video_label.image = None
+        self.zoom_factor = 1.0
+        self.zoom_btn.set(1.0)
+        self.zoom_value_label.configure(text="1.0x")
 
     def update_camera(self):
         """Video stream update loop."""
@@ -331,6 +400,8 @@ class OhmegaResistorApp(ctk.CTk):
             if ret:
                 self.current_frame = frame.copy()  # Keep a copy for capture
                 self.display_image(frame)
+                
+
 
     def capture_image(self):
         """Capture the current camera image for processing."""
