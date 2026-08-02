@@ -26,7 +26,8 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 class ResistorColoredBandsModel():
     def __init__(self):
 
-        self.model = YOLO("yolo26n.pt")
+        self.model = YOLO("YOLO/yolo26n.pt")
+        
 RCBM = ResistorColoredBandsModel()
 class OhmegaResistorApp(ctk.CTk):
     def __init__(self):
