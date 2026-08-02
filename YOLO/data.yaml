@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 13
+names: ['Resistor', 'black', 'blue', 'brown', 'gold', 'gray', 'green', 'orange', 'purple', 'red', 'silver', 'white', 'yellow']
+
+roboflow:
+  workspace: nemelions-workspace
+  project: resistor-and-colored-bands
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/nemelions-workspace/resistor-and-colored-bands/dataset/1
