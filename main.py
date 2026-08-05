@@ -6,34 +6,17 @@ from tkinter import filedialog  # For file selection
 from ultralytics import YOLO
 
 
-COLOUR_MAP = [
-    [(0, 0, 0),       (179, 255, 93),   "BLACK",  0, (0, 0, 0)],    
-    [(0, 90, 10),     (15, 250, 100),   "BROWN",  1, (0, 51, 102)],    
-    [(0, 30, 80),     (10, 255, 200),   "RED",    2, (0, 0, 255)],
-    [(10, 70, 70),    (25, 255, 200),   "ORANGE", 3, (0, 128, 255)], 
-    [(30, 170, 100),  (40, 250, 255),   "YELLOW", 4, (0, 255, 255)],
-    [(35, 20, 110),   (60, 45, 120),    "GREEN",  5, (0, 255, 0)],  
-    [(65, 0, 85),     (115, 30, 147),   "BLUE",   6, (255, 0, 0)],  
-    [(120, 40, 100),  (140, 250, 220),  "PURPLE", 7, (255, 0, 127)], 
-    [(0, 0, 50),      (179, 50, 80),    "GRAY",   8, (128, 128, 128)],      
-    [(0, 0, 90),      (179, 15, 250),   "WHITE",  9, (255, 255, 255)]
-]
-RED_TOP_LOWER = (160, 30, 80)
-RED_TOP_UPPER = (179, 255, 200)
-MIN_AREA = 700
-FONT = cv2.FONT_HERSHEY_SIMPLEX
-
 class ResistorColoredBandsModel():
     def __init__(self):
 
-        self.model = YOLO("YOLO/yolo26n.pt")
+        self.model = YOLO("runs/detect/yolo26n_resistor_color_bands_detection/weights/best.pt")  # Load the trained YOLOv8 model
         
 RCBM = ResistorColoredBandsModel()
 class OhmegaResistorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Ohmega Vision Resistor Reader")
-        self.geometry("850x700")
+        self.geometry("850x600")
         self.iconbitmap("Tools/OhmegaVision.ico")  # Set your icon path here
 
         # Bottom fram for author and version
@@ -50,20 +33,30 @@ class OhmegaResistorApp(ctk.CTk):
         self.video_frame = ctk.CTkFrame(self)
         self.video_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
+        # Confidence threshold control on the left side of the video frame
+        self.confidence_frame = ctk.CTkFrame(self.video_frame)
+        self.confidence_frame.pack(side="left", fill="y", padx=(0, 10), pady=10)
+        self.confidence_label = ctk.CTkLabel(self.confidence_frame, text="Confidence")
+        self.confidence_label.pack(side="top", padx=10, pady=(10, 5))
+        self.confidence_threshold = 0.28
+        self.confidence_slider = ctk.CTkSlider(
+            self.confidence_frame,
+            from_=0.05,
+            to=0.95,
+            number_of_steps=90,
+            orientation="vertical",
+            command=self.update_confidence_threshold
+        )
+        self.confidence_slider.set(self.confidence_threshold)
+        self.confidence_slider.pack(side="top", fill="y", padx=10, pady=(5, 0))
+        self.confidence_value_label = ctk.CTkLabel(self.confidence_frame, text=f"{self.confidence_threshold:.2f}")
+        self.confidence_value_label.pack(side="top", pady=(5, 10))
+
         # Label to display the image or video stream
         self.video_label = ctk.CTkLabel(self.video_frame, text="")
-        self.video_label.pack(padx=10, pady=10)
+        self.video_label.pack(side="left", padx=10, pady=10)
 
-        #zoom button
-        self.zoom_frame = ctk.CTkFrame(self.video_frame)
-        self.zoom_frame.pack(side="top", fill="x", padx=10, pady=10)
-        self.zoom_label = ctk.CTkLabel(self.zoom_frame, text="Zoom Camera:")
-        self.zoom_label.pack(side="left", padx=10)
-        self.zoom_btn = ctk.CTkSlider(self.zoom_frame, from_=1.0, to=8.0, number_of_steps=70, command=self.zoom_video)
-        self.zoom_btn.set(1.0)
-        self.zoom_btn.pack(side="left", padx=10)
-        self.zoom_value_label = ctk.CTkLabel(self.zoom_frame, text="1.0x")
-        self.zoom_value_label.pack(side="left", padx=10)
+        
 
         # Label to display the result
         self.result_frame = ctk.CTkFrame(self.video_frame)
@@ -110,6 +103,17 @@ class OhmegaResistorApp(ctk.CTk):
 
         self.camera_button_frame.grid_columnconfigure(0, weight=1)
         self.camera_button_frame.grid_columnconfigure(1, weight=1)
+
+        #zoom button
+        self.zoom_frame = ctk.CTkFrame(self.camera_frame)
+        self.zoom_frame.pack(side="top", fill="x", padx=10, pady=10)
+        self.zoom_label = ctk.CTkLabel(self.zoom_frame, text="Zoom Camera:")
+        self.zoom_label.pack(side="left", padx=10)
+        self.zoom_btn = ctk.CTkSlider(self.zoom_frame, from_=1.0, to=8.0, number_of_steps=70, command=self.zoom_video)
+        self.zoom_btn.set(1.0)
+        self.zoom_btn.pack(side="left", padx=10)
+        self.zoom_value_label = ctk.CTkLabel(self.zoom_frame, text="1.0x")
+        self.zoom_value_label.pack(side="left", padx=10)
 
         
 
@@ -175,12 +179,6 @@ class OhmegaResistorApp(ctk.CTk):
         #about_btn = ctk.CTkButton(help_buttons_frame, text="About", command=self.show_about)
         #about_btn.pack(side="top", padx=10, pady=10)
 
-        
-
-
-        
-        
-
 
         # Camera variables
         self.cap = None
@@ -188,6 +186,14 @@ class OhmegaResistorApp(ctk.CTk):
         self.thread = None
         self.current_frame = None  # To store the current frame
         self.zoom_factor = 1.0
+
+    def update_confidence_threshold(self, value):
+        """Update the confidence threshold and immediately reprocess the current frame."""
+        self.confidence_threshold = float(value)
+        self.confidence_value_label.configure(text=f"{self.confidence_threshold:.2f}")
+
+        if self.current_frame is not None:
+            self.process_image(self.current_frame)
 
     def open_top_window(self, title,language):
         """Open a new top-level window with the given title and content."""
@@ -302,7 +308,7 @@ class OhmegaResistorApp(ctk.CTk):
         """Open a dialog to select an image."""
         # Open the file dialog for image files
         file_path = filedialog.askopenfilename(
-            title="Select an image",
+            title="Select an image of a resistor",
             filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff")]
         )
         if file_path:
@@ -310,12 +316,10 @@ class OhmegaResistorApp(ctk.CTk):
             img = cv2.imread(file_path)
            
             if img is not None:
-                # Display the image in the interface
-                self.display_image(img)
+                self.current_frame = img.copy()
                 # Start processing
-                self.process_image(img)
-                result = RCBM.model(img)
-                cv2.imshow("test window", result[0].plot())
+                self.process_image(self.current_frame)
+                
     def show_guide(self,img):
         pass
 
@@ -347,17 +351,7 @@ class OhmegaResistorApp(ctk.CTk):
         # Update the label with the new image
         self.video_label.configure(image=ctk_image)
         self.video_label.image = ctk_image  # Keep a reference
-        """Display an image in the video label."""
-        # Convert BGR (OpenCV) to RGB (PIL)
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # Convert to PIL Image
-        pil_img = Image.fromarray(img_rgb)
-        # Create a CustomTkinter image
-        ctk_image = ctk.CTkImage(light_image=pil_img, size=(440, 280))
-        # Update the label with the new image
-        self.video_label.configure(image=ctk_image)
-        self.video_label.image = ctk_image  # Keep a reference
-
+        
     def start_camera(self):
         """Start the camera stream in a separate thread."""
         if self.running:
@@ -414,59 +408,114 @@ class OhmegaResistorApp(ctk.CTk):
         Main function to analyze the resistor image.
         (To be implemented with the steps below)
         """
-        # 1. Image preprocessing
-        processed_img = self.preprocess_image(img)
+        # Step 1 : Process the image to enhance detection (e.g., resizing, filtering)
+        results = RCBM.model(img, conf=self.confidence_threshold)  # Run the YOLO model on the image
+        result = results[0]  # Get the first result
 
-        # 2. Detect and analyze the color bands
-        bands = self.detect_color_bands(processed_img)
+        # Step 2 : Get the annotated image with bounding boxes
+        annotated_img = result.plot()  # Get the annotated image with bounding boxes
+        self.display_image(annotated_img)  # Display the annotated image
 
-        # 3. Calculate the resistor value
-        if bands:
-            resistance_value = self.calculate_resistance(bands)
+        # Step 3 : Extract the detected color bands from the results
+        boxes = result.boxes # Get bounding boxes
+        detected_bands = []
+        for box in boxes:
+            cls_id = int(box.cls[0].item())  # Get class ID
+            color_name = RCBM.model.names[cls_id].lower()  # Get color name from model
+
+            if color_name !='resistor':
+                x_min = box.xyxy[0][0].item()
+                detected_bands.append((x_min,color_name))
+
+        # Step 4 : Sort the detected bands based on their x-coordinates (left to right)
+        detected_bands.sort(key=lambda x: x[0])
+        print(detected_bands) #for debugging
+        sorted_bands = [band[1] for band in detected_bands]  # Sort by x-coordinate
+
+        # Step 5 : Calculate the resistance value based on the detected bands
+        if sorted_bands:
+            resistance_value = self.calculate_resistance(sorted_bands)
             self.result_label.configure(text=f"Value: {resistance_value} Ω")
         else:
-            self.result_label.configure(text="Value: Not detected")
+            self.result_label.configure(text="Value: Not detected") 
 
-    def preprocess_image(self, img):
-        """Clean the image to make detection easier."""
+    
+
+    #def preprocess_image(self, img):
+       # """Clean the image to make detection easier."""
         # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # Apply a filter to reduce noise while preserving edges
-        blurred = cv2.bilateralFilter(gray, 9, 75, 75)
+        #blurred = cv2.bilateralFilter(gray, 9, 75, 75)
         # Adaptive thresholding to separate the bands from the background
-        thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-        return thresh
+        #thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+        #return thresh
 
-    def detect_color_bands(self, processed_img):
-        """
-        Detect the color bands and return a list of their colors.
-        This is the hardest part to implement properly.
-        """
-        # Step 1: Find the contour of the resistor
-        # Step 2: Isolate the resistor and straighten it
-        # Step 3: For each band, extract its color
-        # Step 4: Map the color to a value (black=0, brown=1, etc.)
-
-        # Very simplified example (to be replaced by real logic)
-        # For now, return a fictitious list
-        return ["brown", "black", "red", "gold"]
+  
 
     def calculate_resistance(self, bands):
         """Calculate the resistor value from the colors of the bands."""
-        # Color-to-digit mapping dictionary
-        color_map = {
+        
+        print("Initiale bands:",bands)
+
+        if bands and bands[0] in ['gold','silver']:
+            bands.reverse()
+            print("Reversed bands:" ,bands)
+
+        color_values = {
             "black": 0, "brown": 1, "red": 2, "orange": 3, "yellow": 4,
             "green": 5, "blue": 6, "violet": 7, "gray": 8, "white": 9
         }
-        # For a 4-band resistor: 1st digit, 2nd digit, multiplier, tolerance
-        if len(bands) >= 3:
-            val1 = color_map.get(bands[0], 0)
-            val2 = color_map.get(bands[1], 0)
-            multiplier = 10 ** color_map.get(bands[2], 0)
-            resistance = (val1 * 10 + val2) * multiplier
-            return resistance
+        
+        multiplier_values = {
+            "black": 1, "brown": 10, "red": 100, "orange": 1000, "yellow": 10000,
+            "green": 100000, "blue": 1000000, "violet": 10000000, "gray": 100000000, "white": 1000000000,
+            "gold": 0.1, "silver": 0.01
+        }
+        
+        tolerance_values = {
+            "brown": "±1%", "red": "±2%", "green": "±0.5%", "blue": "±0.25%", "violet": "±0.1%",
+            "gray": "±0.05%", "gold": "±5%", "silver": "±10%"
+        }
+
+        # if the number of bands is not sufficiente
+        if len(bands) < 3:
+            return "Error: non-compliant number of bands"
+
+        try:
+            # Calculate for four bands (Value 1, Value 2, Multiplier, Tolerance)
+            if len(bands) == 3 or len(bands) == 4:
+                val = (color_values[bands[0]] * 10) + color_values[bands[1]]
+                res = val * multiplier_values.get(bands[2], 1)
+                
+                # if there is a fourth band it's the tolerance, otherwise we are taking "±20%"
+                tol = tolerance_values.get(bands[3], "") if len(bands) == 4 else "±20%"
+                
+                return f"{self.format_ohms(res)} {tol}"
+
+            # Calculate for 5 bands (Value 1, 2, 3, Multiplier, Tolerance)
+            elif len(bands) >= 5:
+                val = (color_values[bands[0]] * 100) + (color_values[bands[1]] * 10) + color_values[bands[2]]
+                res = val * multiplier_values.get(bands[3], 1)
+                tol = tolerance_values.get(bands[4], "")
+                return f"{self.format_ohms(res)} {tol}"
+                
+        except KeyError as e:
+            return f"Error : Unexpectited color detected ({e})"
+
         return "Error"
 
+        
+        
+    def format_ohms(self,value):
+        """Formatt"""
+        if value >= 1_000_000:
+            return f"{value / 1_000_000:.2f} MΩ"
+        elif value >= 1_000:
+            return f"{value / 1_000:.2f} kΩ"
+        else:
+            # Enlever les décimales .00 inutiles
+            return f"{value:g} Ω"
 
 if __name__ == "__main__":
     app = OhmegaResistorApp()
