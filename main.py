@@ -409,7 +409,7 @@ class OhmegaResistorApp(ctk.CTk):
         (To be implemented with the steps below)
         """
         # Step 1 : Process the image to enhance detection (e.g., resizing, filtering)
-        results = RCBM.model(img, conf=self.confidence_threshold)  # Run the YOLO model on the image
+        results = RCBM.model(img, conf=self.confidence_threshold, iou = 0.2)  # Run the YOLO model on the image
         result = results[0]  # Get the first result
 
         # Step 2 : Get the annotated image with bounding boxes
