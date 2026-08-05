@@ -429,10 +429,24 @@ class OhmegaResistorApp(ctk.CTk):
 
         # Step 4 : Sort the detected bands based on their x-coordinates (left to right)
         detected_bands.sort(key=lambda x: x[0])
-        print(detected_bands) #for debugging
-        sorted_bands = [band[1] for band in detected_bands]  # Sort by x-coordinate
+        print("Detected bands:",detected_bands) #for debugging
+        
+        # Step 5 : filtering by x-coordonate to avoid double detection
+        filtered_bands = []
+        last_x = -100 # Initialisation
+        pixel_threshold = 20 # threshold coef in pixels
 
-        # Step 5 : Calculate the resistance value based on the detected bands
+        for x_min, color_name in detected_bands:
+            if (x_min-last_x) > pixel_threshold :
+                filtered_bands.append(color_name)
+                last_x = x_min
+            else : 
+                pass
+
+        sorted_bands = filtered_bands  # Sort by x-coordinate
+        print("Filtered bands:", sorted_bands)  # For debugging
+
+        # Step 6 : Calculate the resistance value based on the detected bands
         if sorted_bands:
             resistance_value = self.calculate_resistance(sorted_bands)
             self.result_label.configure(text=f"Value: {resistance_value} Ω")
