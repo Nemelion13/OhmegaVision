@@ -99,6 +99,14 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_capture": "Freeze the stream and calculate the resistance.",
                 "tt_open": "Load an image from your computer.",
                 "tt_clean": "Stop the camera and clear the results.",
+                "tt_zoom": "Adjust the camera zoom level.",
+                "tt_theme": "Change between Light and Dark themes.",
+                "tt_language": "Select the UI language.",
+                "tt_select_camera": "Choose which camera index to use, change if you're using webcam.",
+                "tt_sensitivity": "Adjust detection sensitivity (confidence).",
+                "tt_help_btn": "Open the help window with usage instructions.",
+                "tt_guide_btn": "Open a visual guide image explaining readings.",
+                "tt_detected_colors": "Shows colors detected on the resistor.",
                 # Colors
                 "black": "Black", "brown": "Brown", "red": "Red", "orange": "Orange",
                 "yellow": "Yellow", "green": "Green", "blue": "Blue", "violet": "Violet",
@@ -128,6 +136,14 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_capture": "Gèle l'image et calcule la valeur de la résistance.",
                 "tt_open": "Charge une photo depuis l'ordinateur.",
                 "tt_clean": "Coupe la caméra et nettoie l'interface.",
+                "tt_zoom": "Ajuste le niveau de zoom de la caméra.",
+                "tt_theme": "Basculer entre les thèmes Clair et Sombre.",
+                "tt_language": "Sélectionnez la langue de l'interface.",
+                "tt_select_camera": "Choisissez l'index de la caméra à utiliser,changer si webcam utilisée.",
+                "tt_sensitivity": "Ajuste la sensibilité de détection (confiance).",
+                "tt_help_btn": "Ouvre la fenêtre d'aide avec les instructions.",
+                "tt_guide_btn": "Ouvre un guide visuel expliquant la lecture.",
+                "tt_detected_colors": "Affiche les couleurs détectées sur la résistance.",
                 # Colors
                 "black": "Noir", "brown": "Marron", "red": "Rouge", "orange": "Orange",
                 "yellow": "Jaune", "green": "Vert", "blue": "Bleu", "violet": "Violet",
@@ -214,12 +230,6 @@ class OhmegaResistorApp(ctk.CTk):
         self.language_box.set("English")
         self.language_box.pack(side="right", padx=5)
 
-        # Attach Tooltips now that language_box exists
-        ToolTip(self.camera_btn, {"English": self.translations["English"]["tt_start"], "Français": self.translations["Français"]["tt_start"]}, self.language_box)
-        ToolTip(self.capture_btn, {"English": self.translations["English"]["tt_capture"], "Français": self.translations["Français"]["tt_capture"]}, self.language_box)
-        ToolTip(self.file_btn, {"English": self.translations["English"]["tt_open"], "Français": self.translations["Français"]["tt_open"]}, self.language_box)
-        ToolTip(self.clean_btn, {"English": self.translations["English"]["tt_clean"], "Français": self.translations["Français"]["tt_clean"]}, self.language_box)
-
         # Appearance Mode
         appearance_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
         appearance_frame.pack(side="top", fill="x", pady=5, padx=10)
@@ -279,8 +289,7 @@ class OhmegaResistorApp(ctk.CTk):
         
         self.confidence_value_label = ctk.CTkLabel(self.confidence_frame, text=f"{self.confidence_threshold:.2f}")
         self.confidence_value_label.pack(side="bottom", pady=(5, 15))
-
-        # Main Displaying Frame (Center)
+# Main Displaying Frame (Center)
         self.displaying_frame = ctk.CTkFrame(self.video_frame)
         self.displaying_frame.pack(side="left", fill="both", expand=True, padx=(0, 5), pady=10)
         
@@ -302,6 +311,25 @@ class OhmegaResistorApp(ctk.CTk):
         
         self.bands_display_container = ctk.CTkFrame(self.colors_detected_frame, fg_color="transparent")
         self.bands_display_container.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Attach Tooltips now that language_box exists
+        ToolTip(self.camera_btn, {"English": self.translations["English"]["tt_start"], "Français": self.translations["Français"]["tt_start"]}, self.language_box)
+        ToolTip(self.capture_btn, {"English": self.translations["English"]["tt_capture"], "Français": self.translations["Français"]["tt_capture"]}, self.language_box)
+        ToolTip(self.file_btn, {"English": self.translations["English"]["tt_open"], "Français": self.translations["Français"]["tt_open"]}, self.language_box)
+        ToolTip(self.clean_btn, {"English": self.translations["English"]["tt_clean"], "Français": self.translations["Français"]["tt_clean"]}, self.language_box)
+        # Additional ToolTips for other controls
+        ToolTip(self.zoom_btn, {"English": self.translations["English"]["tt_zoom"], "Français": self.translations["Français"]["tt_zoom"]}, self.language_box)
+        ToolTip(self.appearance_mode, {"English": self.translations["English"]["tt_theme"], "Français": self.translations["Français"]["tt_theme"]}, self.language_box)
+        ToolTip(self.language_box, {"English": self.translations["English"]["tt_language"], "Français": self.translations["Français"]["tt_language"]}, self.language_box)
+        ToolTip(self.camera_index_box, {"English": self.translations["English"]["tt_select_camera"], "Français": self.translations["Français"]["tt_select_camera"]}, self.language_box)
+        ToolTip(self.confidence_slider, {"English": self.translations["English"]["tt_sensitivity"], "Français": self.translations["Français"]["tt_sensitivity"]}, self.language_box)
+        ToolTip(self.help_btn, {"English": self.translations["English"]["tt_help_btn"], "Français": self.translations["Français"]["tt_help_btn"]}, self.language_box)
+        ToolTip(self.guide_btn, {"English": self.translations["English"]["tt_guide_btn"], "Français": self.translations["Français"]["tt_guide_btn"]}, self.language_box)
+        ToolTip(self.colors_title, {"English": self.translations["English"]["tt_detected_colors"], "Français": self.translations["Français"]["tt_detected_colors"]}, self.language_box)
+
+        
+
+        
 
 
        
