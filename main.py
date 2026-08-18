@@ -20,14 +20,16 @@ class OhmegaResistorApp(ctk.CTk):
         self.iconbitmap("Tools/OhmegaVision.ico")  # Set your icon path here
 
         # Bottom fram for author and version
-        self.bottom_frame = ctk.CTkFrame(self)
-        self.bottom_frame.pack(side="bottom", fill="x", pady=5, padx=5)
-        self.author_label = ctk.CTkLabel(self.bottom_frame, text="Developed by nemelion13 - All rights reserved © 2026")
+        self.bottom_frame = ctk.CTkFrame(self, height=30, fg_color="transparent")
+        self.bottom_frame.pack(side="top", fill="x", padx=10, pady=(0, 5))
+        self.author_label = ctk.CTkLabel(self.bottom_frame, text="Developed by nemelion13 - All rights reserved © 2026", font=("Arial", 10))
         self.author_label.pack(side="left", padx=10)
-        self.version_label = ctk.CTkLabel(self.bottom_frame, text="Version 1.0")
+        self.version_label = ctk.CTkLabel(self.bottom_frame, text="Version 1.2", font=("Arial", 10))
         self.version_label.pack(side="right", padx=10)
         self.contact_label = ctk.CTkLabel(self.bottom_frame, text="Contact: nemelion13@gmail.com")
         self.contact_label.pack(side="right", padx=10)
+
+        
 
         #Frame for video and zoom button
         self.video_frame = ctk.CTkFrame(self)
@@ -68,7 +70,7 @@ class OhmegaResistorApp(ctk.CTk):
 
 
         # Frame for the buttons
-        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame = ctk.CTkFrame(self, width=300)
         self.button_frame.pack(side="left",fill= "y",padx=10, pady=10)
 
         # Frame for the camera and capture buttons
