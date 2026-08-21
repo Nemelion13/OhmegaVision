@@ -575,12 +575,12 @@ class OhmegaResistorApp(ctk.CTk):
         detected_bands.sort(key=lambda x: x[0]); print("Detected bands (sorted):", detected_bands)
         
         filtered_bands = []
-        last_x = -80
-        pixel_threshold = 15
+        last_x = -110
+        pixel_threshold = 25
 
         for x_min, color_name in detected_bands:
             # Using abs() as a safety net and if two consecutive bands are different colors but very close, we still want to keep them
-            if abs(x_min - last_x) > pixel_threshold and (not filtered_bands or color_name != filtered_bands[-1]):
+            if not filtered_bands or color_name != filtered_bands[-1] or abs(x_min - last_x) > pixel_threshold:
                 filtered_bands.append(color_name)
                 last_x = x_min
 
