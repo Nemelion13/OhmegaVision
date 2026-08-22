@@ -110,7 +110,10 @@ class OhmegaResistorApp(ctk.CTk):
                 # Colors
                 "black": "Black", "brown": "Brown", "red": "Red", "orange": "Orange",
                 "yellow": "Yellow", "green": "Green", "blue": "Blue", "purple": "Purple",
-                "gray": "Gray", "white": "White", "gold": "Gold", "silver": "Silver"
+                "gray": "Gray", "white": "White", "gold": "Gold", "silver": "Silver",
+                # Error messages
+                "Error: Unable to open the camera, change the index or verify your device.": "Error: Unable to open the camera, change the index or verify your device."
+
             },
             "Français": {
                 "Value": "Valeur : ",
@@ -147,7 +150,9 @@ class OhmegaResistorApp(ctk.CTk):
                 # Colors
                 "black": "Noir", "brown": "Marron", "red": "Rouge", "orange": "Orange",
                 "yellow": "Jaune", "green": "Vert", "blue": "Bleu", "purple": "Violet",
-                "gray": "Gris", "white": "Blanc", "gold": "Or", "silver": "Argent"
+                "gray": "Gris", "white": "Blanc", "gold": "Or", "silver": "Argent",
+                # Error messages
+                "Error: Unable to open the camera, change the index or verify your device.": "Erreur : Impossible d'ouvrir la caméra, changez l'index ou vérifiez votre appareil."
             }
         }
         
@@ -354,6 +359,7 @@ class OhmegaResistorApp(ctk.CTk):
         top_window = ctk.CTkToplevel(self)
         top_window.geometry("600x450")
         current_lang = self.language_box.get()
+        top_window.focus_force()
         
         if window_type == "Help":
             top_window.title(self.translations[current_lang]["Help"])
@@ -406,6 +412,7 @@ class OhmegaResistorApp(ctk.CTk):
             self.zoom_label.configure(text=trans["Zoom:"])
             self.confidence_label.configure(text=trans["Sensitivity"])
             self.colors_title.configure(text=trans["Detected Colors"])
+            
             
             # Buttons
             if not self.running:
@@ -480,6 +487,16 @@ class OhmegaResistorApp(ctk.CTk):
         self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             print("Error: Unable to open the camera.")
+            # Error message to user
+            current_lang = self.language_box.get()
+            error_msg = self.translations[current_lang].get("Error: Unable to open the camera, change the index or verify your device.", "Error: Unable to open the camera, change the index or verify your device.")
+            # top level window for error
+            error_window = ctk.CTkToplevel(self)
+            error_window.title("Error")
+            error_window.geometry("400x150")
+            error_label = ctk.CTkLabel(error_window, text=error_msg, font=("Arial", 14), wraplength=380)
+            error_label.pack(expand=True, fill="both", padx=20, pady=20)
+            
             return
             
         self.running = True
@@ -660,3 +677,4 @@ class OhmegaResistorApp(ctk.CTk):
 if __name__ == "__main__":
     app = OhmegaResistorApp()
     app.mainloop()
+    
