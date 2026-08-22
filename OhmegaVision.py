@@ -109,7 +109,7 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_detected_colors": "Shows colors detected on the resistor.",
                 # Colors
                 "black": "Black", "brown": "Brown", "red": "Red", "orange": "Orange",
-                "yellow": "Yellow", "green": "Green", "blue": "Blue", "violet": "Violet",
+                "yellow": "Yellow", "green": "Green", "blue": "Blue", "purple": "Purple",
                 "gray": "Gray", "white": "White", "gold": "Gold", "silver": "Silver"
             },
             "Français": {
@@ -146,7 +146,7 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_detected_colors": "Affiche les couleurs détectées sur la résistance.",
                 # Colors
                 "black": "Noir", "brown": "Marron", "red": "Rouge", "orange": "Orange",
-                "yellow": "Jaune", "green": "Vert", "blue": "Bleu", "violet": "Violet",
+                "yellow": "Jaune", "green": "Vert", "blue": "Bleu", "purple": "Violet",
                 "gray": "Gris", "white": "Blanc", "gold": "Or", "silver": "Argent"
             }
         }
@@ -155,7 +155,7 @@ class OhmegaResistorApp(ctk.CTk):
         self.color_hex_map = {
             "black": "#2c3e50", "brown": "#8B4513", "red": "#e74c3c", 
             "orange": "#e67e22", "yellow": "#f1c40f", "green": "#2ecc71", 
-            "blue": "#3498db", "violet": "#9b59b6", "gray": "#95a5a6", 
+            "blue": "#3498db", "purple": "#9b59b6", "gray": "#95a5a6", 
             "white": "#ffffff", "gold": "#f39c12", "silver": "#bdc3c7"
         }
 
@@ -615,19 +615,19 @@ class OhmegaResistorApp(ctk.CTk):
         # Dictionary mappings
         color_values = {
             "black": 0, "brown": 1, "red": 2, "orange": 3, "yellow": 4,
-            "green": 5, "blue": 6, "violet": 7, "gray": 8, "white": 9
+            "green": 5, "blue": 6, "purple": 7, "gray": 8, "white": 9
         }
         multiplier_values = {
             "black": 1, "brown": 10, "red": 100, "orange": 1000, "yellow": 10000,
-            "green": 100000, "blue": 1000000, "violet": 10000000, "gray": 100000000, "white": 1000000000,
+            "green": 100000, "blue": 1000000, "purple": 10000000, "gray": 100000000, "white": 1000000000,
             "gold": 0.1, "silver": 0.01
         }
         tolerance_values = {
-            "brown": "±1%", "red": "±2%", "green": "±0.5%", "blue": "±0.25%", "violet": "±0.1%",
+            "brown": "±1%", "red": "±2%", "green": "±0.5%", "blue": "±0.25%", "purple": "±0.1%",
             "gray": "±0.05%", "gold": "±5%", "silver": "±10%"
         }
 
-        if len(bands) < 3:
+        if len(bands) < 3 or len(bands) > 5:
             return "Error"
 
         try:
