@@ -572,7 +572,7 @@ class OhmegaResistorApp(ctk.CTk):
             name_label.pack(side="left")
 
     def process_image(self, img):
-        results = RCBM.model(img, conf=self.confidence_threshold, iou=0.2)
+        results = RCBM.model(img, conf=self.confidence_threshold, iou=0.2, agnostic_nms=True)
         result = results[0]
 
         annotated_img = result.plot()
@@ -584,25 +584,41 @@ class OhmegaResistorApp(ctk.CTk):
             cls_id = int(box.cls[0].item())
             class_name = RCBM.model.names[cls_id].lower()
 
-            if class_name:
+            if class_name!='resistor':
                 x_min = box.xyxy[0][0].item()
-                detected_bands.append((x_min, class_name))
+                conf = box.conf[0].item()
+                detected_bands.append((x_min, class_name,conf))
 
         # Spatial sorting and filtering
         detected_bands.sort(key=lambda x: x[0]); print("Detected bands (sorted):", detected_bands)
         
         filtered_bands = []
-        last_x = -80
-        pixel_threshold = 15
+        if detected_bands:
+            #group initialization
+            current_group = [detected_bands[0]]
+            pixel_threshold = 15
 
-        for x_min, color_name in detected_bands:
-            # Using abs() as a safety net and if two consecutive bands are different colors but very close, we still want to keep them
-            if abs(x_min - last_x) > pixel_threshold and (not filtered_bands or color_name != filtered_bands[-1]):
-                filtered_bands.append(color_name)
-                last_x = x_min
+            # Analyze the lefting bands detected
+            for i in range(1,len(detected_bands)):
+                x_min, color_name, conf = detected_bands[i]
+                last_x = current_group[-1][0]
+
+                if abs(x_min-last_x) <= pixel_threshold:
+                    current_group.append((x_min,color_name,conf))
+                    print(f"Current groupe{i}:{current_group}")
+                else:
+                    #gap is too large : it's a new band of colour
+                    best_band = max(current_group,key=lambda item: item[2])
+                    filtered_bands.append(best_band[1])
+
+                    #start a new group
+                    current_group = [(x_min,color_name,conf)]
+                    print(f"Current groupe{i}:{current_group}")
+                
+            best_band = max(current_group, key= lambda item: item[2])
+            filtered_bands.append(best_band[1])
 
         sorted_bands = filtered_bands 
-        sorted_bands = [band for band in sorted_bands if band !="resistor"]
         print("Filtered bands (after thresholding):", sorted_bands)
         
         # --- LOGIC REVERSAL BEFORE UI UPDATE ---
