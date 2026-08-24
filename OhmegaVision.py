@@ -624,8 +624,9 @@ class OhmegaResistorApp(ctk.CTk):
         # --- LOGIC REVERSAL BEFORE UI UPDATE ---
         # If the user held the resistor backwards, we reverse the list 
         # so the UI displays the logical reading order top-to-bottom
-        if sorted_bands and sorted_bands[0] in ['gold', 'silver']:
-            sorted_bands.reverse()
+        if sorted_bands:
+            if sorted_bands[0] in ['gold', 'silver'] or (len(sorted_bands) > 1 and sorted_bands[1] in ['gold', 'silver']):
+                sorted_bands.reverse()
         print("Final sorted bands (after potential reversal):", sorted_bands)
         # Update the UI Panel with detected colors
         self.update_colors_ui(sorted_bands)
@@ -660,7 +661,7 @@ class OhmegaResistorApp(ctk.CTk):
             "gray": "±0.05%", "gold": "±5%", "silver": "±10%"
         }
 
-        if len(bands) < 3 or len(bands) > 5:
+        if len(bands) < 3 :
             return "Error"
 
         try:

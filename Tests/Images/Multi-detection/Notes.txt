@@ -1,0 +1,7 @@
+A few observations regarding the results obtained.
+
+The model is capable of detecting multiple resistors and their color bands, 
+and the image processing algorithm can calculate the values, 
+but only if the resistors are all identical. For batches of different resistors, 
+the algorithm would need to be modified to process them one by one, 
+bearing in mind that changing the confidence threshold for the image affects the detection results for all resistors present in that image.

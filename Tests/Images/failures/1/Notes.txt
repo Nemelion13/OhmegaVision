@@ -1,0 +1,11 @@
+A few observations regarding the results obtained.
+
+It is evident that the results depend on the sensitivity (confidence level).
+The files "4_sensitivity0.19.png" and "6_sensitivity0.32" show that all color bands were detected;
+however, either the pixel threshold eliminates a band ("6_sensitivity0.32") or the YOLO model detects the same band
+(same x-coordinate) with different colors.
+Example: in the file "4_sensitivity0.19.png," we have a four-band resistor, yet five color bands are observed because
+        YOLO detected [(brown, 0.77), (red, 0.32)] at the same position.
+
+For the other files, errors are due to undetected bands and incorrect color identifications 
+resulting from the weakness of the YOLO model.

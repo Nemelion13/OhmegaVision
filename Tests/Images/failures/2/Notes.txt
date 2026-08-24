@@ -1,0 +1,23 @@
+A few observations regarding the results obtained.
+
+The algorithm fails to calculate the resistance values ​​presented vertically.
+Indeed, when a resistor is vertical, all the bands share roughly the same x-coordinates
+and are therefore immediately eliminated by the pixel threshold.
+
+I managed to correct the resistance band readings in the files: "4_sensitivity0.19.png" and "6_sensitivity0.32" .
+Check the success/2 folder to observe the correction with the same confidence level.
+
+The previous tests from success/1 were done again and are still correct.
+
+I can't explain properly what is happening on the file interesting_failure.png
+Maybe the pixel_threshold is too short. I will try to create an adaptative pixel_threshold and
+modify the program to include resistance presented with the vertical axis.
+0: 640x640 1 Resistor, 3 golds, 2 reds, 251.7ms
+Speed: 10.8ms preprocess, 251.7ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 640)
+Detected bands (sorted): [(290.1214599609375, 'gold', 0.6039052605628967), (314.4132385253906, 'gold', 0.0928683876991272), (314.63946533203125, 'gold', 0.11479627341032028), (328.2290954589844, 'red', 0.2326022833585739), (340.6546936035156, 'red', 0.42411619424819946)]
+Current groupe1:[(314.4132385253906, 'gold', 0.0928683876991272)]
+Current groupe2:[(314.4132385253906, 'gold', 0.0928683876991272), (314.63946533203125, 'gold', 0.11479627341032028)]
+Current groupe3:[(314.4132385253906, 'gold', 0.0928683876991272), (314.63946533203125, 'gold', 0.11479627341032028), (328.2290954589844, 'red', 0.2326022833585739)]
+Current groupe4:[(314.4132385253906, 'gold', 0.0928683876991272), (314.63946533203125, 'gold', 0.11479627341032028), (328.2290954589844, 'red', 0.2326022833585739), (340.6546936035156, 'red', 0.42411619424819946)]
+Filtered bands (after thresholding): ['gold', 'red']
+Final sorted bands (after potential reversal): ['red', 'gold']
