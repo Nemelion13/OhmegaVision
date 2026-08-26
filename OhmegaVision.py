@@ -286,7 +286,7 @@ class OhmegaResistorApp(ctk.CTk):
         
         self.confidence_threshold = 0.4
         self.confidence_slider = ctk.CTkSlider(
-            self.confidence_frame, from_=0.05, to=0.95, number_of_steps=90, 
+            self.confidence_frame, from_=0.01, to=0.99, number_of_steps=98, 
             orientation="vertical", command=self.update_confidence_threshold
         )
         self.confidence_slider.set(self.confidence_threshold)
@@ -584,43 +584,80 @@ class OhmegaResistorApp(ctk.CTk):
             cls_id = int(box.cls[0].item())
             class_name = RCBM.model.names[cls_id].lower()
 
-            if class_name!='resistor':
-                x_min = box.xyxy[0][0].item()
+            if class_name != 'resistor':
+                x1 = box.xyxy[0][0].item()
+                y1 = box.xyxy[0][1].item()
+                x2 = box.xyxy[0][2].item()
+                y2 = box.xyxy[0][3].item()
                 conf = box.conf[0].item()
-                detected_bands.append((x_min, class_name,conf))
+            
+                # Calculate the center of the box
+                x_center = (x1 + x2) / 2
+                y_center = (y1 + y2) / 2
+            
+                detected_bands.append((x_center, y_center, class_name, conf))
 
-        # Spatial sorting and filtering
-        detected_bands.sort(key=lambda x: x[0]); print("Detected bands (sorted):", detected_bands)
+        # --- 1. DETERMINE THE ORIENTATION ---
+        if detected_bands:
+            x_coords = [b[0] for b in detected_bands]
+            y_coords = [b[1] for b in detected_bands]
         
+            spread_x = max(x_coords) - min(x_coords)
+            spread_y = max(y_coords) - min(y_coords)
+        
+            # If the spread on X is greater than on Y, the resistor is horizontal
+            is_horizontal = spread_x >= spread_y
+        
+            # Define the sorting axis and grouping threshold
+            if is_horizontal:
+                sort_index = 0  # index de x_center
+                # Dynamic threshold: 10% of the total spread on X, with a minimum of 10px
+                pixel_threshold = max(10, int(spread_x * 0.10))
+                print("Orientation: Horizontale")
+                print("Pixel threshold used:",pixel_threshold)
+            else:
+                sort_index = 1  # index de y_center
+                pixel_threshold = max(10, int(spread_y * 0.10))
+                print("Orientation: Verticale")
+                print("Pixel threshold used:",pixel_threshold)
+            
+        # --- 2. SORT AND GROUP ON THE CORRECT AXIS ---
+        # Sort by the X center OR the Y center according to the orientation
+        detected_bands.sort(key=lambda x: x[sort_index])
+        print("Detected bands (sorted):", detected_bands)
+
         filtered_bands = []
         if detected_bands:
-            #group initialization
             current_group = [detected_bands[0]]
-            pixel_threshold = 15
 
-            # Analyze the lefting bands detected
-            for i in range(1,len(detected_bands)):
-                x_min, color_name, conf = detected_bands[i]
-                last_x = current_group[-1][0]
+            for i in range(1, len(detected_bands)):
+                x_center, y_center, color_name, conf = detected_bands[i]
+                # Get the reference coordinate of the group's last element
+                last_coord = current_group[-1][sort_index]
 
-                if abs(x_min-last_x) <= pixel_threshold:
-                    current_group.append((x_min,color_name,conf))
-                    print(f"Current groupe{i}:{current_group}")
+                # Compare the positions on the relevant axis
+                current_coord = detected_bands[i][sort_index]
+            
+                if abs(current_coord - last_coord) <= pixel_threshold:
+                    current_group.append((x_center, y_center, color_name, conf))
+                    print(f"Current group {i}: {current_group}")
                 else:
-                    #gap is too large : it's a new band of colour
-                    best_band = max(current_group,key=lambda item: item[2])
-                    filtered_bands.append(best_band[1])
-
-                    #start a new group
-                    current_group = [(x_min,color_name,conf)]
-                    print(f"Current groupe{i}:{current_group}")
+                    # Gap is too large: start a new band
+                    best_band = max(current_group, key=lambda item: item[3])  # item[3] = conf
+                    filtered_bands.append(best_band[2])  # best_band[2] = color_name
                 
-            best_band = max(current_group, key= lambda item: item[2])
-            filtered_bands.append(best_band[1])
-
-        sorted_bands = filtered_bands 
-        print("Filtered bands (after thresholding):", sorted_bands)
+                    current_group = [(x_center, y_center, color_name, conf)]
+                    print(f"New group {i}: {current_group}")
         
+            # Dernier groupe
+            best_band = max(current_group, key=lambda item: item[3])
+            filtered_bands.append(best_band[2])
+
+        sorted_bands = filtered_bands
+        print("Filtered bands (after thresholding):", sorted_bands)
+    
+
+      
         # --- LOGIC REVERSAL BEFORE UI UPDATE ---
         # If the user held the resistor backwards, we reverse the list 
         # so the UI displays the logical reading order top-to-bottom
