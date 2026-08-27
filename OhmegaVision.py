@@ -48,6 +48,222 @@ class ResistorColoredBandsModel():
     def __init__(self):
         # Load the trained YOLO model
         self.model = YOLO("runs/detect/yolo26n_resistor_color_bands_detection/weights/best.pt") 
+        self.resistors = []
+
+    def box_iou(self,box_a, box_b):
+        ax1, ay1, ax2, ay2 = box_a
+        bx1, by1, bx2, by2 = box_b
+
+        intersection_x1 = max(ax1, bx1)
+        intersection_y1 = max(ay1, by1)
+        intersection_x2 = min(ax2, bx2)
+        intersection_y2 = min(ay2, by2)
+
+        intersection_width = max(0, intersection_x2 - intersection_x1)
+        intersection_height = max(0, intersection_y2 - intersection_y1)
+        intersection_area = intersection_width * intersection_height
+
+        area_a = (ax2 - ax1) * (ay2 - ay1)
+        area_b = (bx2 - bx1) * (by2 - by1)
+        union_area = area_a + area_b - intersection_area
+
+        return intersection_area / union_area if union_area else 0
+
+    def analyze_image(self, img, conf_threshold):
+        print("*"*120)
+        print("Analysing image")
+        self.resistors = []
+        img_resized = cv2.resize(img, (640, 640))
+        results = self.model(img_resized, conf=conf_threshold, iou=0.3, agnostic_nms=False)
+        result = results[0]
+        annotated_img = result.plot()
+
+        raw_resistors = []
+        all_bands = []
+
+        # 1. Extract resistors and separate bands
+        for box in result.boxes:
+            cls_id = int(box.cls[0].item())
+            class_name = self.model.names[cls_id].lower()
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            conf = box.conf[0].item()
+
+            if class_name == "resistor":
+                raw_resistors.append({"box": (x1, y1, x2, y2), "conf": conf})
+                
+            else:
+                x_center = (x1 + x2) / 2
+                y_center = (y1 + y2) / 2
+                all_bands.append({"center": (x_center, y_center), "color": class_name, "conf": conf})
+
+        # 2. Filter out duplicate detections (IoU > 0.3 = same resistor)
+        filtered_resistors = []
+        raw_resistors.sort(key=lambda x: x["conf"], reverse=True)
+        for r in raw_resistors:
+            keep = True
+            for fr in filtered_resistors:
+                if self.box_iou(r["box"], fr["box"]) > 0.3:
+                    keep = False
+                    break
+            if keep:
+                filtered_resistors.append(r)
+                
+
+        # 3. Assign bands and calculate the values
+        for r in filtered_resistors:
+            x1, y1, x2, y2 = r["box"]
+            width = x2 - x1
+            height = y2 - y1
+            x1 -= width * 0.05
+            y1 -= height * 0.05
+            x2 += width * 0.05
+            y2 += height * 0.05
+            my_bands = []
+            
+            # Point-in-Box
+            for b in all_bands:
+                cx, cy = b["center"]
+                if x1 <= cx <= x2 and y1 <= cy <= y2:
+                    my_bands.append(b)
+
+            sorted_colors = self._sort_and_group_bands(my_bands)
+            val = self.calculate_resistance(sorted_colors)
+            
+            self.resistors.append({
+                "box": r["box"],
+                "bands": sorted_colors,
+                "value": val
+            })
+        print('')
+        # debugging
+        print("Analyse completed : Here are resistors")
+        for index, resistor in enumerate(self.resistors, start=1):
+            print(f"Resistor {index} : {resistor['bands']} : value = {resistor['value']}")
+            cv2.putText(annotated_img,f"R{index}",(int(resistor["box"][2]),int(resistor["box"][3])),cv2.FONT_HERSHEY_TRIPLEX,3,(50,0,255))
+
+        return annotated_img, self.resistors
+    
+    def _sort_and_group_bands(self, detected_bands):
+        print("*"*120)
+        print("New resistor, Bands sorting")
+
+        if not detected_bands:
+            print("No bands detected")
+            return []
+
+        # --- 1. DETERMINE THE ORIENTATION ---
+        x_coords = [b["center"][0] for b in detected_bands]
+        y_coords = [b["center"][1] for b in detected_bands]
+        
+        spread_x = max(x_coords) - min(x_coords)
+        spread_y = max(y_coords) - min(y_coords)
+        
+        # If the spread on X is greater than on Y, the resistor is horizontal
+        is_horizontal = spread_x >= spread_y
+        
+        # Define the sorting axis and grouping threshold
+        if is_horizontal:
+            sort_index = 0  # x-center index
+            # Dynamic threshold: 10% of the total spread on X, with a minimum of 10px
+            pixel_threshold = max(10, int(spread_x * 0.10))
+            print("Orientation: Horizontale")
+            print("Pixel threshold used:",pixel_threshold)
+        else:
+            sort_index = 1  # y-center index
+            pixel_threshold = max(10, int(spread_y * 0.10))
+            print("Orientation: Verticale")
+            print("Pixel threshold used:",pixel_threshold)
+            
+        # --- 2. SORT AND GROUP ON THE CORRECT AXIS ---
+        # Sort by the X center OR the Y center according to the orientation
+        detected_bands.sort(key=lambda band: band["center"][sort_index])
+        print("Detected bands (sorted):", detected_bands)
+
+        filtered_bands = []
+        if detected_bands:
+            current_group = [detected_bands[0]]
+
+            for i in range(1, len(detected_bands)):
+                current_band = detected_bands[i]
+                # Get the reference coordinate of the group's last element
+                last_coord = current_group[-1]["center"][sort_index]
+
+                # Compare the positions on the relevant axis
+                current_coord = current_band["center"][sort_index]
+            
+                if abs(current_coord - last_coord) <= pixel_threshold:
+                    current_group.append(current_band)
+                    print(f"Current group {i}: {current_group}")
+                else:
+                    # Gap is too large: start a new band
+                    best_band = max(current_group, key=lambda item: item["conf"])
+                    filtered_bands.append(best_band["color"])
+                
+                    current_group = [current_band]
+                    print(f"New group {i}: {current_group}")
+        
+            # last group
+            best_band = max(current_group, key=lambda item: item["conf"])
+            filtered_bands.append(best_band["color"])
+
+        sorted_bands = filtered_bands
+        print("Filtered bands (after thresholding):", sorted_bands)
+        
+      
+        # --- LOGIC REVERSAL BEFORE UI UPDATE ---
+        # If the user held the resistor backwards, we reverse the list 
+        # so the UI displays the logical reading order top-to-bottom
+        if sorted_bands:
+            if sorted_bands[0] in ['gold', 'silver'] or (len(sorted_bands) > 1 and sorted_bands[1] in ['gold', 'silver']):
+                sorted_bands.reverse()
+        print("Final sorted bands (after potential reversal):", sorted_bands)
+
+        return sorted_bands
+
+    def calculate_resistance(self, bands):
+        # Dictionary mappings
+        color_values = {
+            "black": 0, "brown": 1, "red": 2, "orange": 3, "yellow": 4,
+            "green": 5, "blue": 6, "purple": 7, "gray": 8, "white": 9
+        }
+        multiplier_values = {
+            "black": 1, "brown": 10, "red": 100, "orange": 1000, "yellow": 10000,
+            "green": 100000, "blue": 1000000, "purple": 10000000, "gray": 100000000, "white": 1000000000,
+            "gold": 0.1, "silver": 0.01
+        }
+        tolerance_values = {
+            "brown": "±1%", "red": "±2%", "green": "±0.5%", "blue": "±0.25%", "purple": "±0.1%",
+            "gray": "±0.05%", "gold": "±5%", "silver": "±10%"
+        }
+    
+        if len(bands) < 3 :
+            return "Error"
+    
+        try:
+            if len(bands) == 3 or len(bands) == 4:
+                val = (color_values[bands[0]] * 10) + color_values[bands[1]]
+                res = val * multiplier_values.get(bands[2], 1)
+                tol = tolerance_values.get(bands[3], "") if len(bands) == 4 else "±20%"
+                return f"{self.format_ohms(res)} {tol}"
+    
+            elif len(bands) >= 5:
+                val = (color_values[bands[0]] * 100) + (color_values[bands[1]] * 10) + color_values[bands[2]]
+                res = val * multiplier_values.get(bands[3], 1)
+                tol = tolerance_values.get(bands[4], "")
+                return f"{self.format_ohms(res)} {tol}"
+                    
+        except KeyError:
+            return "Error"
+        return "Error"
+    
+            
+    def format_ohms(self, value):
+        if value >= 1_000_000:
+            return f"{value / 1_000_000:.2f} MΩ"
+        elif value >= 1_000:
+            return f"{value / 1_000:.2f} kΩ"
+        else:
+            return f"{value:g} Ω"
         
 RCBM = ResistorColoredBandsModel()
 
@@ -64,7 +280,7 @@ class OhmegaResistorApp(ctk.CTk):
         self.bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(0, 5))
         self.author_label = ctk.CTkLabel(self.bottom_frame, text="Developed by nemelion13 - All rights reserved © 2026", font=("Arial", 10))
         self.author_label.pack(side="left", padx=10)
-        self.version_label = ctk.CTkLabel(self.bottom_frame, text="Version 1.2", font=("Arial", 10))
+        self.version_label = ctk.CTkLabel(self.bottom_frame, text="Version 1.3", font=("Arial", 10))
         self.version_label.pack(side="right", padx=10)
         self.contact_label = ctk.CTkLabel(self.bottom_frame, text="Contact: nemelion13@gmail.com")
         self.contact_label.pack(side="right", padx=10)
@@ -107,6 +323,8 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_help_btn": "Open the help window with usage instructions.",
                 "tt_guide_btn": "Open a visual guide image explaining readings.",
                 "tt_detected_colors": "Shows colors detected on the resistor.",
+                "resistor": "Resistor",
+                "resistors_number":"Number of Resistors Detected",
                 # Colors
                 "black": "Black", "brown": "Brown", "red": "Red", "orange": "Orange",
                 "yellow": "Yellow", "green": "Green", "blue": "Blue", "purple": "Purple",
@@ -147,6 +365,8 @@ class OhmegaResistorApp(ctk.CTk):
                 "tt_help_btn": "Ouvre la fenêtre d'aide avec les instructions.",
                 "tt_guide_btn": "Ouvre un guide visuel expliquant la lecture.",
                 "tt_detected_colors": "Affiche les couleurs détectées sur la résistance.",
+                "resistor": "Résistance",
+                "resistors_number": "Nombre de Résistances Détectées",
                 # Colors
                 "black": "Noir", "brown": "Marron", "red": "Rouge", "orange": "Orange",
                 "yellow": "Jaune", "green": "Vert", "blue": "Bleu", "purple": "Violet",
@@ -273,6 +493,16 @@ class OhmegaResistorApp(ctk.CTk):
         self.guide_btn = ctk.CTkButton(help_buttons_frame, text="Visual Guide", command=lambda: self.open_top_window("Guide"), fg_color="#9b59b6")
         self.guide_btn.pack(side="right", expand=True, padx=5)
 
+        # 4. Number of Resistors frame
+        Resistor_number_frame = ctk.CTkFrame(self.button_frame)
+        Resistor_number_frame.pack(side="top", fill="x", padx=10, pady=10)
+        Resistor_number_label_frame = ctk.CTkFrame(Resistor_number_frame, fg_color="transparent")
+        Resistor_number_label_frame.pack(side="top", fill="x", padx=10, pady=(10,5))
+        self.resistor_number_label = ctk.CTkLabel(Resistor_number_label_frame, text="Number of Resistors Detected:", font=("Arial", 12, "bold"))
+        self.resistor_number_label.pack(side="left", padx=10, pady=5)
+        self.resistor_number_value = ctk.CTkLabel(Resistor_number_label_frame, text="0", font=("Arial", 12))
+        self.resistor_number_value.pack(side="left", padx=10, pady=5)
+
 
         # --- RIGHT PANEL: VIDEO & RESULTS ---
         self.video_frame = ctk.CTkFrame(self.main_container)
@@ -294,14 +524,15 @@ class OhmegaResistorApp(ctk.CTk):
         
         self.confidence_value_label = ctk.CTkLabel(self.confidence_frame, text=f"{self.confidence_threshold:.2f}")
         self.confidence_value_label.pack(side="bottom", pady=(5, 15))
-# Main Displaying Frame (Center)
+
+        # Main Displaying Frame (Center)
         self.displaying_frame = ctk.CTkFrame(self.video_frame)
         self.displaying_frame.pack(side="left", fill="both", expand=True, padx=(0, 5), pady=10)
         
         self.video_label = ctk.CTkLabel(self.displaying_frame, text="")
         self.video_label.pack(expand=True, fill="both", padx=10, pady=10)
 
-        self.result_frame = ctk.CTkFrame(self.displaying_frame, height=60)
+        self.result_frame = ctk.CTkScrollableFrame(self.displaying_frame, height=60)
         self.result_frame.pack(side="bottom", fill="x", padx=10, pady=10)
         self.result_label = ctk.CTkLabel(self.result_frame, text="Value: ", font=("Arial", 22, "bold"))
         self.result_label.pack(pady=10)
@@ -314,7 +545,7 @@ class OhmegaResistorApp(ctk.CTk):
         self.colors_title = ctk.CTkLabel(self.colors_detected_frame, text="Detected Colors", font=("Arial", 14, "bold"))
         self.colors_title.pack(side="top", pady=(15, 10))
         
-        self.bands_display_container = ctk.CTkFrame(self.colors_detected_frame, fg_color="transparent")
+        self.bands_display_container = ctk.CTkScrollableFrame(self.colors_detected_frame, fg_color="transparent", scrollbar_button_color = "red")
         self.bands_display_container.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Attach Tooltips now that language_box exists
@@ -331,11 +562,6 @@ class OhmegaResistorApp(ctk.CTk):
         ToolTip(self.help_btn, {"English": self.translations["English"]["tt_help_btn"], "Français": self.translations["Français"]["tt_help_btn"]}, self.language_box)
         ToolTip(self.guide_btn, {"English": self.translations["English"]["tt_guide_btn"], "Français": self.translations["Français"]["tt_guide_btn"]}, self.language_box)
         ToolTip(self.colors_title, {"English": self.translations["English"]["tt_detected_colors"], "Français": self.translations["Français"]["tt_detected_colors"]}, self.language_box)
-
-        
-
-        
-
 
        
 
@@ -412,6 +638,7 @@ class OhmegaResistorApp(ctk.CTk):
             self.zoom_label.configure(text=trans["Zoom:"])
             self.confidence_label.configure(text=trans["Sensitivity"])
             self.colors_title.configure(text=trans["Detected Colors"])
+            self.resistor_number_label.configure(text=trans["resistors_number"])
             
             
             # Buttons
@@ -455,7 +682,7 @@ class OhmegaResistorApp(ctk.CTk):
             start_x = max(0, (w - new_w) // 2)
             cropped = img[start_y:start_y + new_h, start_x:start_x + new_w]
             img = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
-            
+           
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(img_rgb)
         
@@ -525,6 +752,7 @@ class OhmegaResistorApp(ctk.CTk):
         self.current_frame = None
         self.video_label.configure(image="", text="")
         self.video_label.image = None
+        self.resistor_number_value.configure(text = "0")
         
         current_lang = self.language_box.get()
         self.result_label.configure(text=self.translations[current_lang]["Value"])
@@ -545,14 +773,13 @@ class OhmegaResistorApp(ctk.CTk):
             if self.running: self.stop_camera() # Freeze frame logic
             self.process_image(self.current_frame)
 
-    def update_colors_ui(self, bands_list):
+    def update_colors_ui(self, bands_list, resistor_index):
         """Draw the colors list in the right panel."""
-        # Clean previous colors
-        for widget in self.bands_display_container.winfo_children():
-            widget.destroy()
+        
             
         current_lang = self.language_box.get()
-        
+        resistor_name = self.translations[current_lang].get("resistor","resistor")
+        bands_list.insert(0,f"{resistor_name} {resistor_index}")
         for band in bands_list:
             row_frame = ctk.CTkFrame(self.bands_display_container, fg_color="transparent")
             row_frame.pack(fill="x", pady=8, padx=5)
@@ -572,160 +799,38 @@ class OhmegaResistorApp(ctk.CTk):
             name_label.pack(side="left")
 
     def process_image(self, img):
-        results = RCBM.model(img, conf=self.confidence_threshold, iou=0.2, agnostic_nms=True)
-        result = results[0]
-
-        annotated_img = result.plot()
+        print('')
+        print("="*120)
+        print("New Study : Image processing called")
+        print("="*120)
+        # Clean previous colors
+        for widget in self.bands_display_container.winfo_children():
+            widget.destroy()
+        # call the RCBM to analyze the image and get annotated image and detections
+        annotated_img, detections = RCBM.analyze_image(img, self.confidence_threshold)
         self.display_image(annotated_img)
+        numbers_of_resistors = len(detections)
+        self.resistor_number_value.configure(text = f"{int(numbers_of_resistors)}")
 
-        boxes = result.boxes
-        detected_bands = []
-        for box in boxes:
-            cls_id = int(box.cls[0].item())
-            class_name = RCBM.model.names[cls_id].lower()
-
-            if class_name != 'resistor':
-                x1 = box.xyxy[0][0].item()
-                y1 = box.xyxy[0][1].item()
-                x2 = box.xyxy[0][2].item()
-                y2 = box.xyxy[0][3].item()
-                conf = box.conf[0].item()
-            
-                # Calculate the center of the box
-                x_center = (x1 + x2) / 2
-                y_center = (y1 + y2) / 2
-            
-                detected_bands.append((x_center, y_center, class_name, conf))
-
-        # --- 1. DETERMINE THE ORIENTATION ---
-        if detected_bands:
-            x_coords = [b[0] for b in detected_bands]
-            y_coords = [b[1] for b in detected_bands]
-        
-            spread_x = max(x_coords) - min(x_coords)
-            spread_y = max(y_coords) - min(y_coords)
-        
-            # If the spread on X is greater than on Y, the resistor is horizontal
-            is_horizontal = spread_x >= spread_y
-        
-            # Define the sorting axis and grouping threshold
-            if is_horizontal:
-                sort_index = 0  # index de x_center
-                # Dynamic threshold: 10% of the total spread on X, with a minimum of 10px
-                pixel_threshold = max(10, int(spread_x * 0.10))
-                print("Orientation: Horizontale")
-                print("Pixel threshold used:",pixel_threshold)
-            else:
-                sort_index = 1  # index de y_center
-                pixel_threshold = max(10, int(spread_y * 0.10))
-                print("Orientation: Verticale")
-                print("Pixel threshold used:",pixel_threshold)
-            
-        # --- 2. SORT AND GROUP ON THE CORRECT AXIS ---
-        # Sort by the X center OR the Y center according to the orientation
-        detected_bands.sort(key=lambda x: x[sort_index])
-        print("Detected bands (sorted):", detected_bands)
-
-        filtered_bands = []
-        if detected_bands:
-            current_group = [detected_bands[0]]
-
-            for i in range(1, len(detected_bands)):
-                x_center, y_center, color_name, conf = detected_bands[i]
-                # Get the reference coordinate of the group's last element
-                last_coord = current_group[-1][sort_index]
-
-                # Compare the positions on the relevant axis
-                current_coord = detected_bands[i][sort_index]
-            
-                if abs(current_coord - last_coord) <= pixel_threshold:
-                    current_group.append((x_center, y_center, color_name, conf))
-                    print(f"Current group {i}: {current_group}")
-                else:
-                    # Gap is too large: start a new band
-                    best_band = max(current_group, key=lambda item: item[3])  # item[3] = conf
-                    filtered_bands.append(best_band[2])  # best_band[2] = color_name
-                
-                    current_group = [(x_center, y_center, color_name, conf)]
-                    print(f"New group {i}: {current_group}")
-        
-            # Dernier groupe
-            best_band = max(current_group, key=lambda item: item[3])
-            filtered_bands.append(best_band[2])
-
-        sorted_bands = filtered_bands
-        print("Filtered bands (after thresholding):", sorted_bands)
-    
-
-      
-        # --- LOGIC REVERSAL BEFORE UI UPDATE ---
-        # If the user held the resistor backwards, we reverse the list 
-        # so the UI displays the logical reading order top-to-bottom
-        if sorted_bands:
-            if sorted_bands[0] in ['gold', 'silver'] or (len(sorted_bands) > 1 and sorted_bands[1] in ['gold', 'silver']):
-                sorted_bands.reverse()
-        print("Final sorted bands (after potential reversal):", sorted_bands)
-        # Update the UI Panel with detected colors
-        self.update_colors_ui(sorted_bands)
-
-        # Calculate Final Resistance
         current_lang = self.language_box.get()
-        
-        if sorted_bands:
-            resistance_value = self.calculate_resistance(sorted_bands)
-            if "Error" in resistance_value:
-                err_msg = self.translations[current_lang]["Error: Not enough bands"]
-                self.result_label.configure(text=f"{err_msg}")
-            else:
-                self.result_label.configure(text=f"{self.translations[current_lang]['Value']}{resistance_value}")
+
+        # Display the bands of resistors and the value of every resistor.
+        if detections:
+            
+            result_lines = []
+            for index, resistor in enumerate(detections, start=1):
+                self.update_colors_ui(resistor["bands"],index)
+                resistance_value = resistor["value"]
+
+                if "Error" in resistance_value:
+                    resistance_value = self.translations[current_lang]["Error: Not enough bands"]
+                result_lines.append(f"R{index}: {resistance_value}")
+
+            self.result_label.configure(text="\n".join(result_lines))
         else:
-            self.result_label.configure(text=f"{self.translations[current_lang]['Value']}{self.translations[current_lang]['Not detected']}") 
-
-
-    def calculate_resistance(self, bands):
-        # Dictionary mappings
-        color_values = {
-            "black": 0, "brown": 1, "red": 2, "orange": 3, "yellow": 4,
-            "green": 5, "blue": 6, "purple": 7, "gray": 8, "white": 9
-        }
-        multiplier_values = {
-            "black": 1, "brown": 10, "red": 100, "orange": 1000, "yellow": 10000,
-            "green": 100000, "blue": 1000000, "purple": 10000000, "gray": 100000000, "white": 1000000000,
-            "gold": 0.1, "silver": 0.01
-        }
-        tolerance_values = {
-            "brown": "±1%", "red": "±2%", "green": "±0.5%", "blue": "±0.25%", "purple": "±0.1%",
-            "gray": "±0.05%", "gold": "±5%", "silver": "±10%"
-        }
-
-        if len(bands) < 3 :
-            return "Error"
-
-        try:
-            if len(bands) == 3 or len(bands) == 4:
-                val = (color_values[bands[0]] * 10) + color_values[bands[1]]
-                res = val * multiplier_values.get(bands[2], 1)
-                tol = tolerance_values.get(bands[3], "") if len(bands) == 4 else "±20%"
-                return f"{self.format_ohms(res)} {tol}"
-
-            elif len(bands) >= 5:
-                val = (color_values[bands[0]] * 100) + (color_values[bands[1]] * 10) + color_values[bands[2]]
-                res = val * multiplier_values.get(bands[3], 1)
-                tol = tolerance_values.get(bands[4], "")
-                return f"{self.format_ohms(res)} {tol}"
-                
-        except KeyError:
-            return "Error"
-        return "Error"
-
-        
-    def format_ohms(self, value):
-        if value >= 1_000_000:
-            return f"{value / 1_000_000:.2f} MΩ"
-        elif value >= 1_000:
-            return f"{value / 1_000:.2f} kΩ"
-        else:
-            return f"{value:g} Ω"
+            for widget in self.bands_display_container.winfo_children():
+                widget.destroy()
+            self.result_label.configure(text=f"{self.translations[current_lang]['Value']}{self.translations[current_lang]['Not detected']}")
 
 
 if __name__ == "__main__":
